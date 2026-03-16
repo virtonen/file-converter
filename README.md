@@ -14,13 +14,23 @@ file-converter/
 
 ## Requirements
 
-- [Go](https://golang.org/dl/) 1.21+
-- A modern web browser (Chrome, Firefox, Edge, Safari)
+- **[Go](https://go.dev/dl/) 1.21+**
+  - **Windows (PowerShell):** Download and run the `.msi` installer. After installation, **restart your terminal** so the `go` command is recognized.
+  - **macOS:** Download and run the `.pkg` installer or use Homebrew (`brew install go`).
+- A modern **web browser** (Chrome, Firefox, Edge, Safari)
 
 ## Running
 
 ### 1 – Start the backend
 
+#### Windows (PowerShell)
+```powershell
+cd backend
+go run main.go
+# Listening on :8080
+```
+
+#### macOS / Linux (Bash/Zsh)
 ```bash
 cd backend
 go run .
@@ -39,6 +49,13 @@ Open **http://localhost:8080** in your browser.
 
 ## Running tests
 
+#### Windows (PowerShell)
+```powershell
+cd backend
+go test -v ./...
+```
+
+#### macOS / Linux (Bash/Zsh)
 ```bash
 cd backend
 go test -v ./...
