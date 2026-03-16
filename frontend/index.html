@@ -1,0 +1,202 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>JPG → PNG Converter</title>
+  <style>
+    *, *::before, *::after { box-sizing: border-box; }
+    body {
+      margin: 0;
+      font-family: system-ui, sans-serif;
+      background: #f0f2f5;
+      display: flex;
+      justify-content: center;
+      align-items: center;
+      min-height: 100vh;
+    }
+    .card {
+      background: #fff;
+      border-radius: 12px;
+      box-shadow: 0 4px 24px rgba(0,0,0,.10);
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 440px;
+    }
+    h1 { margin: 0 0 1.5rem; font-size: 1.5rem; color: #111; text-align: center; }
+    .drop-zone {
+      border: 2px dashed #9ca3af;
+      border-radius: 8px;
+      padding: 2rem;
+      text-align: center;
+      color: #6b7280;
+      cursor: pointer;
+      transition: border-color .2s, background .2s;
+    }
+    .drop-zone.active { border-color: #6366f1; background: #eef2ff; }
+    .drop-zone input[type="file"] { display: none; }
+    .preview {
+      margin-top: 1rem;
+      text-align: center;
+    }
+    .preview img {
+      max-width: 100%;
+      max-height: 200px;
+      border-radius: 6px;
+      border: 1px solid #e5e7eb;
+    }
+    button {
+      margin-top: 1.25rem;
+      width: 100%;
+      padding: .75rem;
+      border: none;
+      border-radius: 8px;
+      background: #6366f1;
+      color: #fff;
+      font-size: 1rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: background .2s;
+    }
+    button:disabled { background: #a5b4fc; cursor: not-allowed; }
+    button:not(:disabled):hover { background: #4f46e5; }
+    .status {
+      margin-top: 1rem;
+      text-align: center;
+      font-size: .9rem;
+    }
+    .status.error { color: #dc2626; }
+    .status.success { color: #16a34a; }
+    .download-link {
+      display: inline-block;
+      margin-top: .5rem;
+      color: #6366f1;
+      font-weight: 600;
+      text-decoration: none;
+    }
+    .download-link:hover { text-decoration: underline; }
+  </style>
+</head>
+<body>
+  <div id="root"></div>
+
+  <!-- React + Babel via CDN — no build step required -->
+  <script src="https://unpkg.com/react@18/umd/react.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/react-dom@18/umd/react-dom.production.min.js" crossorigin></script>
+  <script src="https://unpkg.com/@babel/standalone/babel.min.js"></script>
+
+  <script type="text/babel">
+    const { useState, useRef, useCallback } = React;
+
+    const BACKEND_URL = "http://localhost:8080/convert";
+
+    function App() {
+      const [file, setFile] = useState(null);
+      const [preview, setPreview] = useState(null);
+      const [status, setStatus] = useState(null); // { type: 'error'|'success', message }
+      const [downloadUrl, setDownloadUrl] = useState(null);
+      const [downloadName, setDownloadName] = useState("");
+      const [loading, setLoading] = useState(false);
+      const [dragging, setDragging] = useState(false);
+      const inputRef = useRef();
+
+      const acceptFile = useCallback((f) => {
+        if (!f) return;
+        if (!f.type.match(/^image\/jpe?g$/i)) {
+          setStatus({ type: "error", message: "Please select a JPEG/JPG file." });
+          return;
+        }
+        setFile(f);
+        setStatus(null);
+        setDownloadUrl(null);
+        const reader = new FileReader();
+        reader.onload = (e) => setPreview(e.target.result);
+        reader.readAsDataURL(f);
+      }, []);
+
+      const onInputChange = (e) => acceptFile(e.target.files[0]);
+
+      const onDrop = useCallback((e) => {
+        e.preventDefault();
+        setDragging(false);
+        acceptFile(e.dataTransfer.files[0]);
+      }, [acceptFile]);
+
+      const convert = async () => {
+        if (!file) return;
+        setLoading(true);
+        setStatus(null);
+        // Revoke any previous object URL to avoid memory leaks
+        setDownloadUrl((prev) => { if (prev) URL.revokeObjectURL(prev); return null; });
+
+        try {
+          const formData = new FormData();
+          formData.append("file", file);
+
+          const res = await fetch(BACKEND_URL, { method: "POST", body: formData });
+          if (!res.ok) {
+            const text = await res.text();
+            throw new Error(text || `Server error: ${res.status}`);
+          }
+
+          const blob = await res.blob();
+          const url = URL.createObjectURL(blob);
+          const outName = file.name.replace(/\.jpe?g$/i, ".png");
+          setDownloadUrl(url);
+          setDownloadName(outName);
+          setStatus({ type: "success", message: "Conversion successful! Download your PNG below." });
+        } catch (err) {
+          setStatus({ type: "error", message: err.message });
+        } finally {
+          setLoading(false);
+        }
+      };
+
+      return (
+        <div className="card">
+          <h1>JPG → PNG Converter</h1>
+
+          <div
+            className={`drop-zone${dragging ? " active" : ""}`}
+            onClick={() => inputRef.current.click()}
+            onDragOver={(e) => { e.preventDefault(); setDragging(true); }}
+            onDragLeave={() => setDragging(false)}
+            onDrop={onDrop}
+          >
+            <input ref={inputRef} type="file" accept=".jpg,.jpeg,image/jpeg" onChange={onInputChange} />
+            {file
+              ? <span>📎 {file.name} ({(file.size / 1024).toFixed(1)} KB)</span>
+              : <span>Click or drag &amp; drop a <strong>JPG</strong> file here</span>
+            }
+          </div>
+
+          {preview && (
+            <div className="preview">
+              <img src={preview} alt="preview" />
+            </div>
+          )}
+
+          <button onClick={convert} disabled={!file || loading}>
+            {loading ? "Converting…" : "Convert to PNG"}
+          </button>
+
+          {status && (
+            <div className={`status ${status.type}`}>
+              {status.message}
+              {downloadUrl && (
+                <div>
+                  <a className="download-link" href={downloadUrl} download={downloadName}>
+                    ⬇ Download {downloadName}
+                  </a>
+                </div>
+              )}
+            </div>
+          )}
+        </div>
+      );
+    }
+
+    ReactDOM.createRoot(document.getElementById("root")).render(<App />);
+  </script>
+</body>
+</html>
